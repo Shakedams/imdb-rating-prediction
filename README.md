@@ -12,7 +12,6 @@
 | **Elastic Net** (מוגש לתחרות) | 1.0807 ± 0.0083 | 0.8121 ± 0.008 | 0.4025 ± 0.0079 |
 | Random Forest (לניתוחים בסעיפים 5+) | 1.0483 ± 0.0084 | 0.7852 ± 0.0072 | 0.4379 ± 0.0061 |
 
-לפי הוראת המרצה במייל:
 * **המודל המוגש לתחרות**: Elastic Net.
 * **המודל לניתוחים** (Error/Fairness/Feature Importance): Random Forest.
 
@@ -90,7 +89,6 @@ jupyter notebook notebook.ipynb
 | `averageRating` | 🔴 leakage | המשתנה התלוי |
 | `numVotes` | 🔴 leakage | זמין רק אחרי יציאה |
 | `BoxOffice` | 🔴 leakage | הכנסות אחרי יציאה |
-| `budget`, `budget_usd` | ✅ לא leakage | pre-release info, הוחלפו ב-`log_budget` ו-`is_missing_budget` |
 
 ### סינון זמני בפיצ'רים היסטוריים
 
@@ -139,7 +137,6 @@ joblib.load("model.pkl")  # → Pipeline object (לא dict!)
 
 ## 🧩 פיצ'רים (71 בסך הכל)
 
-ראה פירוט מלא בסעיפים 6-7 של ה-notebook. עיקרי:
 * היסטוריות שחקנים/במאי/כותב/מפיק (13 פיצ'רים, מסוננים `year<target`)
 * תוכן וטקסט: `plot_svd_0..79` (TF-IDF + SVD)
 * זמן וז'אנר: 6 פיצ'רים
@@ -155,24 +152,4 @@ joblib.load("model.pkl")  # → Pipeline object (לא dict!)
 * **IMDb non-commercial datasets** — לבניית ההיסטוריות.
 * **TMDB API** — לעמודות `budget_usd`, `certification`, `release_month`.
 
----
 
-## ⚙️ דרישות מערכת
-
-| | |
-|---|---|
-| Python | 3.10+ |
-| RAM | 16 GB מומלץ |
-| Disk | ~10 GB פנוי |
-| scikit-learn | **1.6.1 בדיוק** |
-
-קבצים נוצרים אוטומטית בריצה ראשונה:
-* `.imdb_cache/` (~1.6GB) — IMDb tables (cache)
-* `enriched_dataset.csv` (~70MB) — נוצר אם לא קיים
-
----
-
-## 🎯 Compatibility Check ב-Notebook
-
-ראה Cell 42 ("Compatibility Check — Prof's Test Code") — מריץ את הקוד של המרצה
-על 100 שורות ומדפיס תוצאות. וודאו שזה רץ ללא שגיאה לפני ההגשה.
