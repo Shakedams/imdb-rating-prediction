@@ -1,41 +1,41 @@
-# 🎬 חיזוי דירוג IMDb לפני יציאת סרט
+# 🎬 IMDb Rating Prediction — Pre-Release Movie Forecasting
 
-מטלת סיכום חלק 2 — Machine Learning.
-חיזוי `averageRating` (1–10) של סרטים מתוך נתונים שידועים **לפני יציאת הסרט**.
-
----
-
-## 📊 תוצאות (10-Fold Cross-Validation)
-
-| מודל | RMSE | MAE | R² |
-|------|------|-----|-----|
-| **Elastic Net** (מוגש לתחרות) | 1.0807 ± 0.0083 | 0.8121 ± 0.008 | 0.4025 ± 0.0079 |
-| Random Forest (לניתוחים בסעיפים 5+) | 1.0483 ± 0.0084 | 0.7852 ± 0.0072 | 0.4379 ± 0.0061 |
-
-* **המודל המוגש לתחרות**: Elastic Net.
-* **המודל לניתוחים** (Error/Fairness/Feature Importance): Random Forest.
+**Machine Learning Final Project — Part 2**
+Predicting a film's `averageRating` (1–10) using only features available **before theatrical release**.
 
 ---
 
-## 📁 מבנה הקבצים בהגשה
+## 📊 Results (10-Fold Cross-Validation)
+
+| Model | RMSE | MAE | R² |
+|:------|:----:|:---:|:--:|
+| **Elastic Net** *(submitted to competition)* | **1.0807** ± 0.0083 | 0.8121 ± 0.0081 | 0.4025 ± 0.0079 |
+| Random Forest *(used for §5–§7 analyses)* | 1.0483 ± 0.0084 | 0.7852 ± 0.0072 | 0.4379 ± 0.0061 |
+
+- **Competition model:** Elastic Net — chosen for stability and interpretability.
+- **Analysis model:** Random Forest — used in Error Analysis, Fairness, and Feature Importance per assignment spec (better-performing model on RMSE).
+
+---
+
+## 📁 Submission Contents
 
 ```
-notebook.ipynb              ← המחברת המלאה
-model.pkl                   ← Pipeline של Elastic Net (ישיר, לא bundle!)
-enrichment_globals.pkl      ← מילוני העשרה (נטענים אוטומטית ע"י prepare_data)
-enriched_dataset.csv        ← הדאטה אחרי העשרת TMDB (לקיצור זמן ריצה)
-dataset.csv                 ← הדאטה המקורי
-README.md                   ← הקובץ הזה
-requirements.txt            ← תלויות (קריטי: scikit-learn==1.6.1)
-AI_usage_log.md             ← תיעוד שימוש ב-AI
-report.pdf                  ← דוח 6-8 עמודים
+notebook.ipynb              ← Full Jupyter notebook (end-to-end pipeline)
+model.pkl                   ← Elastic Net Pipeline (direct, not a bundle)
+enrichment_globals.pkl      ← Enrichment dictionaries (auto-loaded by prepare_data)
+enriched_dataset.csv        ← Pre-enriched data (skip TMDB API, saves ~5h)
+dataset.csv                 ← Original dataset from Part 1
+report.pdf                  ← 6–8 page report
+requirements.txt            ← Dependencies (critical: scikit-learn==1.6.1)
+AI_usage_log.md             ← AI consultation log
+README.md                   ← This file
 ```
 
 ---
 
-## ⚡ הפעלת קוד הבדיקה של המרצה
+## ⚡ Running the Instructor's Test Code
 
-הקוד יעבוד **בדיוק כמו שכתבת במייל**, ללא שינויים:
+The submission is designed to work **as-is** with the exact code snippet from the assignment:
 
 ```python
 import pandas as pd
@@ -44,8 +44,8 @@ import joblib
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 df = pd.read_csv("train.csv")
-y = df["averageRating"]
-X = prepare_data(df)              # אוטומטית טוען enrichment_globals.pkl
+y  = df["averageRating"]
+X  = prepare_data(df)                  # auto-loads enrichment_globals.pkl
 
 try:
     model = joblib.load("model.pkl")
@@ -54,7 +54,7 @@ except Exception:
     with open("model.pkl", "rb") as f:
         model = pickle.load(f)
 
-y_pred = model.predict(X)         # ✅ עובד — model.pkl הוא Pipeline ישיר
+y_pred = model.predict(X)              # ✅ model.pkl is a Pipeline — works directly
 
 metrics = pd.DataFrame([{
     "RMSE": np.sqrt(mean_squared_error(y, y_pred)),
@@ -63,93 +63,118 @@ metrics = pd.DataFrame([{
 }])
 ```
 
-**חשוב למרצה**: יש להעתיק את שני הקבצים `model.pkl` ו-`enrichment_globals.pkl`
-לאותה תיקייה. `prepare_data` תטען את ה-enrichment אוטומטית.
+> **Important:** Both `model.pkl` and `enrichment_globals.pkl` must be in the same directory.
+> `prepare_data` automatically loads the enrichment file on first call when running outside the notebook.
 
 ---
 
-## ⚡ הפעלה — דרך מהירה (~1.5-2 שעות) ⭐ מומלץ
+## 🚀 Quick Run (~1.5–2 hours, **recommended**)
 
 ```bash
+# 1. Verify files
 ls dataset.csv enriched_dataset.csv notebook.ipynb
+
+# 2. Install dependencies
 pip install -r requirements.txt
+
+# 3. Launch notebook
 jupyter notebook notebook.ipynb
 ```
 
-המחברת מזהה אוטומטית את `enriched_dataset.csv` ומדלגת על TMDB API.
+The notebook automatically detects `enriched_dataset.csv` and **skips the TMDB API enrichment** (which would otherwise take 4–6 hours).
 
 ---
 
-## 🔒 מניעת Data Leakage
+## 🔒 Data Leakage Prevention
 
-### עמודות "אסורות" (אינן פיצ'רים ישירים):
+### Forbidden Columns (excluded from features)
 
-| עמודה | סטטוס | סיבה |
-|--------|--------|------|
-| `averageRating` | 🔴 leakage | המשתנה התלוי |
-| `numVotes` | 🔴 leakage | זמין רק אחרי יציאה |
-| `BoxOffice` | 🔴 leakage | הכנסות אחרי יציאה |
+| Column | Status | Reason |
+|:-------|:------:|:-------|
+| `averageRating` | 🔴 leakage | The target variable |
+| `numVotes` | 🔴 leakage | Accumulates only after release |
+| `BoxOffice` | 🔴 leakage | Revenue is post-release |
 
-### סינון זמני בפיצ'רים היסטוריים
+### Temporal Filtering of Historical Features
 
-כל פיצ'ר היסטורי (`feat_actor_hist_avg`, וכו') מסונן `year < target_year`.
-**נאמת ב-Cell 38 ב-`assert`**.
+Every historical feature (`feat_actor_hist_avg`, `feat_director_hist_avg`, etc.) is filtered to `year < target_year` — meaning a movie's actor-history feature only uses ratings from films released **before** that movie.
+*Verified by an executable `assert` in Cell 38.*
 
-### עיבוד מקדים בתוך ה-Pipeline
+### In-Pipeline Preprocessing
 
-`Imputer / Scaler / TargetEncoder / TF-IDF` כולם **בתוך** ה-Pipeline,
-ומותאמים רק על fold האימון בכל קיפול של ה-CV.
+`SimpleImputer`, `StandardScaler`, `TargetEncoder`, `TF-IDF + SVD` — all live **inside** the scikit-learn `Pipeline`, so each is fit on the training fold only during cross-validation. No information bleeds from validation folds.
 
-### ניקוי plot אגרסיבי
+### Aggressive Plot Cleaning
 
-* footnote markers `[1][2][3]` הוסרו (26,883 מקרים)
-* משפטים עם דפוסי פוסט-יציאה הוסרו ("won X Award", "cult classic", "highest grossing")
-* Wikipedia-style openers הוסרו
-* רק 2.7% מהplots הפכו ל-NaN, אבל leakage כמעט מלא הוסר
+The `clean_plot()` function removes post-release content from plot text:
+
+- Footnote markers `[1][2][3]` (26,883 instances removed)
+- Sentences containing post-release patterns: *"won an Award"*, *"cult classic"*, *"highest-grossing"*, *"received critical acclaim"*
+- Wikipedia-style openers like *"X is a YEAR film by..."*
+- Only **2.7%** of plots become NaN, but nearly all leakage is eliminated.
 
 ---
 
-## 🧩 ארכיטקטורת הקוד
+## 🧩 Code Architecture
 
-### prepare_data() — עצמאית לחלוטין
+### `prepare_data()` — Fully Self-Contained
 
 ```python
 def prepare_data(df_in: pd.DataFrame) -> pd.DataFrame:
     """
     Self-contained: on first call, auto-loads enrichment_globals.pkl
-    if not in memory. Returns engineered features ready for model.predict().
+    if the enrichment dicts are not in memory (i.e., running outside
+    the notebook). Returns engineered features ready for model.predict().
     """
 ```
 
-* **בתוך המחברת**: משתמשת ב-globals הקיימים.
-* **מחוץ למחברת**: טוענת `enrichment_globals.pkl` אוטומטית.
+- **Inside the notebook:** uses the global enrichment dicts built during training.
+- **Outside the notebook (instructor's environment):** auto-loads `enrichment_globals.pkl`.
 
-### model.pkl — Pipeline ישיר
+### `model.pkl` — Direct Pipeline
 
 ```python
-joblib.load("model.pkl")  # → Pipeline object (לא dict!)
+joblib.load("model.pkl")   # → sklearn.pipeline.Pipeline (NOT a dict / bundle)
 ```
 
-המודל הוא `Pipeline([preprocessor, ElasticNet])` ישיר. הקוד של המרצה
-`model.predict(X)` עובד מיד.
+The artifact is a `Pipeline([preprocessor, ElasticNet])` saved directly. The instructor's `model.predict(X)` call works immediately — no unwrapping needed.
 
 ---
 
-## 🧩 פיצ'רים (71 בסך הכל)
+## 🧪 Feature Set (71 Features Total)
 
-* היסטוריות שחקנים/במאי/כותב/מפיק (13 פיצ'רים, מסוננים `year<target`)
-* תוכן וטקסט: `plot_svd_0..79` (TF-IDF + SVD)
-* זמן וז'אנר: 6 פיצ'רים
-* תקציב: log_budget + is_missing_budget
-* קטגוריאליים: Country, Language, certification, release_season (Target Encoding)
-* בינארי, כותרת, אינטראקציות, one-hot ז'אנרים, missing indicators
+| Group | Count | Examples |
+|:------|:-----:|:---------|
+| **Cast histories** (temporally filtered) | 8 | `feat_actor_hist_avg`, `feat_actor_recent_avg`, `feat_n_proven_stars` |
+| **Crew histories** | 5 | `feat_director_hist_avg`, `feat_writer_hist_avg`, `feat_best_crew` |
+| **Genre dynamics** | 3 | `feat_genre_year_trend`, `feat_genre_year_rolling`, `feat_runtime_genre_dev` |
+| **Plot text (TF-IDF + SVD)** | 50 | `plot_svd_0..49` |
+| **Budget** | 2 | `log_budget`, `is_missing_budget` |
+| **Time / season** | 3 | `years_since_2000`, `release_season`, `has_release_date` |
+| **Categorical (Target Encoded)** | 4 | `lang_primary`, `country_primary`, `content_rating`, `release_season` |
+| **Title-based** | 4 | `title_length`, `title_word_count`, `title_has_colon`, `title_has_number` |
+| **Genre one-hot** | 20 | `g_Drama`, `g_Comedy`, … |
+| **Interactions & missingness** | 12 | `actor_x_director`, `is_missing_actor_hist`, … |
 
 ---
 
-## 📡 מקורות נתונים
+## 📡 Data Sources
 
-* **`dataset.csv`** — הדאטה הניתן ע"י המרצה.
-* **IMDb non-commercial datasets** — לבניית ההיסטוריות.
-* **TMDB API** — לעמודות `budget_usd`, `certification`, `release_month`.
+| Source | Purpose |
+|:-------|:--------|
+| `dataset.csv` | Original dataset from Part 1 (provided) |
+| IMDb non-commercial datasets | Building actor/director/writer historical features |
+| TMDB API | `budget_usd`, `certification` (MPAA), `release_month` |
 
+---
 
+## 🛠️ Technical Requirements
+
+- **Python 3.10+**
+- `scikit-learn==1.6.1` *(strictly required — pickle compatibility)*
+- `random_state=42` everywhere for reproducibility
+- End-to-end runtime: ~1.5–2h with caches (provided) / ~6–9h from scratch
+
+---
+
+*This project was developed in accordance with the academic integrity guidelines specified in the assignment. AI consultation is documented in `AI_usage_log.md`.*
