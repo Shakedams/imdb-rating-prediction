@@ -9,10 +9,10 @@ Predicting a film's `averageRating` (1–10) using only features available **bef
 
 | Model | RMSE | MAE | R² |
 |:------|:----:|:---:|:--:|
-| **Elastic Net** *(submitted to competition)* | **1.0807** ± 0.0083 | 0.8121 ± 0.0081 | 0.4025 ± 0.0079 |
-| Random Forest *(used for §5–§7 analyses)* | 1.0483 ± 0.0084 | 0.7852 ± 0.0072 | 0.4379 ± 0.0061 |
+| **Elastic Net** *(submitted to competition)* | **1.0705** ± 0.0099 | 0.8090 ± 0.0071 | 0.4134 ± 0.0123 |
+| Random Forest *(used for §5–§7 analyses)* | **1.0502** ± 0.0090 | 0.7930 ± 0.0054 | 0.4355 ± 0.0082 |
 
-- **Competition model:** Elastic Net — chosen for stability and interpretability.
+- **Competition model:** Elastic Net — chosen for stability and interpretability (with logit target transformation).
 - **Analysis model:** Random Forest — used in Error Analysis, Fairness, and Feature Importance per assignment spec (better-performing model on RMSE).
 
 ---
@@ -26,7 +26,7 @@ enrichment_globals.pkl      ← Enrichment dictionaries (auto-loaded by prepare_
 enriched_dataset.csv        ← Pre-enriched data (skip TMDB API, saves ~5h)
 dataset.csv                 ← Original dataset from Part 1
 report.pdf                  ← 6–8 page report
-requirements.txt            ← Dependencies (critical: scikit-learn==1.6.1)
+requirements.txt            ← Dependencies
 AI_usage_log.md             ← AI consultation log
 README.md                   ← This file
 ```
@@ -97,8 +97,7 @@ The notebook automatically detects `enriched_dataset.csv` and **skips the TMDB A
 
 ### Temporal Filtering of Historical Features
 
-Every historical feature (`feat_actor_hist_avg`, `feat_director_hist_avg`, etc.) is filtered to `year < target_year` — meaning a movie's actor-history feature only uses ratings from films released **before** that movie.
-*Verified by an executable `assert` in Cell 38.*
+Every historical feature (`feat_actor_hist_avg`, `feat_director_hist_avg`, `feat_franchise_avg`, etc.) is filtered to `year < target_year` — meaning a movie's actor-history feature only uses ratings from films released **before** that movie.
 
 ### In-Pipeline Preprocessing
 
@@ -108,10 +107,20 @@ Every historical feature (`feat_actor_hist_avg`, `feat_director_hist_avg`, etc.)
 
 The `clean_plot()` function removes post-release content from plot text:
 
-- Footnote markers `[1][2][3]` (26,883 instances removed)
+- Footnote markers `[1][2][3]` (Wikipedia-style references)
 - Sentences containing post-release patterns: *"won an Award"*, *"cult classic"*, *"highest-grossing"*, *"received critical acclaim"*
 - Wikipedia-style openers like *"X is a YEAR film by..."*
-- Only **2.7%** of plots become NaN, but nearly all leakage is eliminated.
+
+### Plot Ablation Test (Empirical Verification)
+
+To verify no plot-text leakage, we ran a full 10-fold CV without the plot embeddings:
+
+| Configuration | RMSE | Δ |
+|:--------------|:----:|:--:|
+| EN with plot text | 1.0705 | — |
+| EN without plot text | 1.0741 | **+0.0036 (+0.33%)** |
+
+The marginal contribution of plot text (+0.33%) confirms there is no significant leakage — a leaky plot would have given much larger uplift.
 
 ---
 
@@ -137,24 +146,27 @@ def prepare_data(df_in: pd.DataFrame) -> pd.DataFrame:
 joblib.load("model.pkl")   # → sklearn.pipeline.Pipeline (NOT a dict / bundle)
 ```
 
-The artifact is a `Pipeline([preprocessor, ElasticNet])` saved directly. The instructor's `model.predict(X)` call works immediately — no unwrapping needed.
+The artifact is a `Pipeline([preprocessor, TransformedTargetRegressor(ElasticNet)])` saved directly. The instructor's `model.predict(X)` call works immediately — no unwrapping needed.
 
 ---
 
-## 🧪 Feature Set (71 Features Total)
+## 🧪 Feature Set (85 Input Columns)
 
 | Group | Count | Examples |
 |:------|:-----:|:---------|
 | **Cast histories** (temporally filtered) | 8 | `feat_actor_hist_avg`, `feat_actor_recent_avg`, `feat_n_proven_stars` |
-| **Crew histories** | 5 | `feat_director_hist_avg`, `feat_writer_hist_avg`, `feat_best_crew` |
+| **Crew histories** | 3 | `feat_director_hist_avg`, `feat_writer_hist_avg`, `feat_best_crew` |
+| **Director-specific** | 3 | `feat_director_genre_avg`, `feat_director_rating_std`, `is_missing_director` |
+| **Franchise / Collaboration** | 6 | `feat_franchise_avg`, `feat_collab_dir_actor_avg`, `feat_collab_dir_writer_avg` |
 | **Genre dynamics** | 3 | `feat_genre_year_trend`, `feat_genre_year_rolling`, `feat_runtime_genre_dev` |
-| **Plot text (TF-IDF + SVD)** | 50 | `plot_svd_0..49` |
+| **Plot text (TF-IDF + SVD)** | 1 input → 80 dims (EN) / 50 dims (RF) | `plot_svd_0..N` |
 | **Budget** | 2 | `log_budget`, `is_missing_budget` |
-| **Time / season** | 3 | `years_since_2000`, `release_season`, `has_release_date` |
+| **Time / season** | 4 | `startYear`, `years_since_2000`, `release_season`, `has_release_date` |
 | **Categorical (Target Encoded)** | 4 | `lang_primary`, `country_primary`, `content_rating`, `release_season` |
 | **Title-based** | 4 | `title_length`, `title_word_count`, `title_has_colon`, `title_has_number` |
-| **Genre one-hot** | 20 | `g_Drama`, `g_Comedy`, … |
-| **Interactions & missingness** | 12 | `actor_x_director`, `is_missing_actor_hist`, … |
+| **Genre one-hot** | 20 | `g_Drama`, `g_Comedy`, `g_Documentary`, … |
+| **Polynomial / Interactions** | 14 | `feat_actor_sq`, `actor_x_genre_rolling`, `horror_x_runtime`, … |
+| **Missingness flags** | 3 | `is_missing_actor_hist`, `is_missing_director`, `is_missing_writer` |
 
 ---
 
@@ -163,15 +175,17 @@ The artifact is a `Pipeline([preprocessor, ElasticNet])` saved directly. The ins
 | Source | Purpose |
 |:-------|:--------|
 | `dataset.csv` | Original dataset from Part 1 (provided) |
-| IMDb non-commercial datasets | Building actor/director/writer historical features |
-| TMDB API | `budget_usd`, `certification` (MPAA), `release_month` |
+| IMDb non-commercial datasets | Building actor/director/writer/producer historical features |
+| TMDB API | `budget_usd`, `certification` (MPAA), `release_month`, plot, Language, Country |
+
+The TMDB enrichment covers ~70K movies (all titles in the dataset that needed external data).
 
 ---
 
 ## 🛠️ Technical Requirements
 
 - **Python 3.10+**
-- `scikit-learn==1.6.1` *(strictly required — pickle compatibility)*
+- `scikit-learn>=1.5,<2.0` *(model.pkl loads cleanly across this range)*
 - `random_state=42` everywhere for reproducibility
 - End-to-end runtime: ~1.5–2h with caches (provided) / ~6–9h from scratch
 
